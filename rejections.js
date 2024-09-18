@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Review Queue - Rejection Reasons
 // @namespace    http://viewpointscreening.com
-// @version      1.1
+// @version      1.2
 // @description  Popup Box with searchable rejection reasons, centrally managed via GitHub
 // @author       Mike! Yay!
 // @match        https://www.viewpointscreening.com/thereviewqueue*
