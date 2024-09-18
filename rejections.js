@@ -1,3 +1,15 @@
+// ==UserScript==
+// @name         Review Queue - Rejection Reasons
+// @namespace    http://viewpointscreening.com
+// @version      4.6
+// @description  Popup Box with searchable rejection reasons, with fixes and improvements
+// @author       Mike! Yay!
+// @match        https://www.viewpointscreening.com/thereviewqueue*
+// @grant        GM_xmlhttpRequest
+// @updateURL    https://raw.githubusercontent.com/warklantd/Review-Rejections/main/rejections.js
+// @downloadURL  https://raw.githubusercontent.com/warklantd/Review-Rejections/main/rejections.js
+// ==/UserScript==
+
 (async function () {
     'use strict';
 
@@ -222,7 +234,7 @@
                 if (isDollarMessage) {
                     dollarOrder = parseInt(dollarMessageMatch[1], 10); // Extract the number after $
                     const message = dollarMessageMatch[2].trim();
-                    // Replace '$<number> -' with 'testName -' while excluding the number
+                    // Replace '$<number> -' with 'testName -' excluding the number
                     // Example: '$1 - Please...' becomes 'TestName - Please...'
                     reasonToDisplay = `${testName} - ${message}`;
                     reasonLower = reasonToDisplay.toLowerCase();
