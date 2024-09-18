@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Review Queue - Rejection Reasons
 // @namespace    http://viewpointscreening.com
-// @version      4.0
+// @version      1.1
 // @description  Popup Box with searchable rejection reasons, centrally managed via GitHub
 // @author       Mike! Yay!
 // @match        https://www.viewpointscreening.com/thereviewqueue*
@@ -11,6 +11,7 @@
 // @updateURL    https://raw.githubusercontent.com/warklantd/Review-Rejections/main/rejections.js
 // @downloadURL  https://raw.githubusercontent.com/warklantd/Review-Rejections/main/rejections.js
 // ==/UserScript==
+
 
 (async function () {
     'use strict';
