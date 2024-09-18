@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         Review Queue - Rejection Reasons
 // @namespace    http://viewpointscreening.com
-// @version      4.6
-// @description  Popup Box with searchable rejection reasons, with fixes and improvements
+// @version      1.0
+// @description  Popup Box with searchable rejection reasons, centrally managed via GitHub
 // @author       Mike! Yay!
 // @match        https://www.viewpointscreening.com/thereviewqueue*
 // @grant        GM_xmlhttpRequest
+// @connect      raw.githubusercontent.com
+// @run-at       document-idle
 // @updateURL    https://raw.githubusercontent.com/warklantd/Review-Rejections/main/rejections.js
 // @downloadURL  https://raw.githubusercontent.com/warklantd/Review-Rejections/main/rejections.js
 // ==/UserScript==
@@ -24,9 +26,11 @@
                 method: 'GET',
                 url: url + '&t=' + new Date().getTime(),
                 onload: function (response) {
+                    console.log(`Fetched data from ${url}`);
                     resolve(response.responseText);
                 },
                 onerror: function (error) {
+                    console.error(`Error fetching data from ${url}:`, error);
                     reject(error);
                 }
             });
@@ -76,6 +80,7 @@
                 });
             }
         }
+        console.log('Parsed CSV data:', options);
         return options;
     }
 
@@ -85,9 +90,11 @@
                 method: 'GET',
                 url: url + '&t=' + new Date().getTime(),
                 onload: function (response) {
+                    console.log(`Fetched group data from ${url}`);
                     resolve(response.responseText);
                 },
                 onerror: function (error) {
+                    console.error(`Error fetching group data from ${url}:`, error);
                     reject(error);
                 }
             });
@@ -103,6 +110,7 @@
                 organizationToGroup[organization.toLowerCase()] = group.toLowerCase();
             }
         }
+        console.log('Parsed group data:', organizationToGroup);
         return organizationToGroup;
     }
 
@@ -112,6 +120,7 @@
 
     async function reloadData() {
         try {
+            console.log('Reloading data...');
             const [csvData, groupCsvData] = await Promise.all([
                 fetchCsvData(csvUrl),
                 fetchGroupCsvData(groupCsvUrl)
@@ -127,15 +136,17 @@
                 }
                 groupDefinitions[group].push(org);
             }
+            console.log('Data reloaded successfully.');
         } catch (error) {
             alert('Error fetching data. Please try again later.');
-            console.error('Error fetching CSV data:', error);
+            console.error('Error during data reload:', error);
         }
     }
 
     await reloadData();
 
     function createSearchableList(textarea, testName = '', organizationName = '') {
+        console.log('Creating searchable list...');
         const container = document.createElement('div');
         container.style.position = 'fixed';
         container.style.top = '15%'; // Adjusted position
@@ -192,8 +203,6 @@
         headerContainer.appendChild(orgSearchInput);
         headerContainer.appendChild(searchInput);
         headerContainer.appendChild(refreshButton);
-
-        // Removed the default search buttons section
 
         const optionsContainer = document.createElement('div');
         container.appendChild(optionsContainer);
@@ -270,7 +279,7 @@
                 } else if (searchInputText === '') {
                     reasonMatches = true;
                 } else {
-                    reasonMatches = searchKey === searchInputText;
+                    reasonMatches = searchKey.includes(searchInputText);
                 }
 
                 let shouldDisplay = false;
@@ -358,57 +367,87 @@
             });
         }
 
-        function resizeTextarea(textarea) {
-            textarea.style.height = 'auto';
-            textarea.style.height = Math.max(textarea.scrollHeight, 80) + 'px';
+        orgSearchInput.addEventListener('input', filterOptions);
+        searchInput.addEventListener('input', filterOptions);
+
+        refreshButton.addEventListener('click', async () => {
+            refreshButton.disabled = true;
+            refreshButton.innerText = '⏳';
+            await reloadData();
+            await filterOptions();
+            refreshButton.disabled = false;
+            refreshButton.innerText = '🔄';
+        });
+
+        filterOptions();
+
+        document.body.appendChild(container);
+
+        function closeSearchBox(event) {
+            if (event.target !== container && !container.contains(event.target)) {
+                container.remove();
+                document.removeEventListener('mousedown', closeSearchBox);
+            }
         }
 
-        document.addEventListener('input', (event) => {
-            if (event.target.tagName.toLowerCase() === 'textarea' &&
-                event.target.classList.contains('form-control') &&
-                (event.target.placeholder === 'Message for Student')) {
-                resizeTextarea(event.target);
-            }
-        }, true);
+        document.addEventListener('mousedown', closeSearchBox);
 
-        document.addEventListener('dblclick', (event) => {
-            if (event.target.tagName.toLowerCase() === 'textarea' &&
-                event.target.classList.contains('form-control') &&
-                (event.target.placeholder === 'Message for Student')) {
+        searchInput.focus();
+    }
 
-                event.preventDefault();
+    function resizeTextarea(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.max(textarea.scrollHeight, 80) + 'px';
+    }
 
-                let currentRow = event.target.closest('tr');
-                if (!currentRow) return;
+    // Handle textarea input to resize
+    document.addEventListener('input', (event) => {
+        if (
+            event.target.tagName.toLowerCase() === 'textarea' &&
+            event.target.classList.contains('form-control') &&
+            event.target.placeholder === 'Message for Student'
+        ) {
+            resizeTextarea(event.target);
+        }
+    }, true);
 
-                let mainRow = currentRow.previousElementSibling;
-                if (!mainRow) return;
+    // Handle double-click to open the popup
+    document.addEventListener('dblclick', (event) => {
+        if (
+            event.target.tagName.toLowerCase() === 'textarea' &&
+            event.target.classList.contains('form-control') &&
+            event.target.placeholder === 'Message for Student'
+        ) {
+            event.preventDefault();
 
-                let testNameCell = mainRow.cells[2];
-                if (!testNameCell) return;
+            let currentRow = event.target.closest('tr');
+            if (!currentRow) return;
 
-                let testNameElement = testNameCell.querySelector('vp');
-                let testName = testNameElement ? testNameElement.innerText.trim() : '';
+            let mainRow = currentRow.previousElementSibling;
+            if (!mainRow) return;
 
-                let organizationCell = mainRow.cells[4];
-                if (!organizationCell) return;
+            let testNameCell = mainRow.cells[2];
+            if (!testNameCell) return;
 
-                let organizationElement = organizationCell.querySelector('em') || organizationCell.querySelector('vp');
-                let organizationName = organizationElement ? organizationElement.innerText.trim() : '';
+            let testNameElement = testNameCell.querySelector('vp');
+            let testName = testNameElement ? testNameElement.innerText.trim() : '';
 
-                createSearchableList(event.target, testName, organizationName);
+            let organizationCell = mainRow.cells[4];
+            if (!organizationCell) return;
 
-                event.target.addEventListener('input', () => {
-                    resizeTextarea(event.target);
-                });
-            }
-        }, true);
+            let organizationElement = organizationCell.querySelector('em') || organizationCell.querySelector('vp');
+            let organizationName = organizationElement ? organizationElement.innerText.trim() : '';
 
-        window.addEventListener('load', (event) => {
-            const textarea = document.querySelector('textarea.form-control[placeholder="Message for Student"]');
-            if (textarea) {
-                textarea.style.height = '80px';
-                resizeTextarea(textarea);
-            }
-        });
-    })();
+            createSearchableList(event.target, testName, organizationName);
+        }
+    }, true);
+
+    // Initial resize on page load
+    window.addEventListener('load', (event) => {
+        const textarea = document.querySelector('textarea.form-control[placeholder="Message for Student"]');
+        if (textarea) {
+            textarea.style.height = '80px';
+            resizeTextarea(textarea);
+        }
+    });
+})();
