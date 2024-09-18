@@ -13,6 +13,8 @@
 (async function () {
     'use strict';
 
+    console.log('Review Queue - Rejection Reasons script loaded');
+
     const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8kAJf9wYSgyFSvwOj_Kj9XpuL1gLrEScup-vaj8is-SDBFvGs2CVJqiqinKtBryNWVxuy1NE1MqyD/pub?output=csv';
     const groupCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRgSydK8b7RGP0g7r8D9wC1MFQ2_PvDNkOAzrcZ3YubCgOws3rmmA2EEWD-RH_XnfKvUb9YnpbMlbhD/pub?output=csv';
 
@@ -127,6 +129,7 @@
             }
         } catch (error) {
             alert('Error fetching data. Please try again later.');
+            console.error('Error fetching CSV data:', error);
         }
     }
 
@@ -208,12 +211,16 @@
                 if (organizationToGroup.hasOwnProperty(orgFilterText)) {
                     const groupName = organizationToGroup[orgFilterText];
                     const groupOrgs = groupDefinitions[groupName];
-                    groupOrgs.forEach(orgName => acceptableOrganizations.add(orgName.toLowerCase()));
-                    acceptableOrganizations.add(groupName.toLowerCase());
+                    if (groupOrgs) {
+                        groupOrgs.forEach(orgName => acceptableOrganizations.add(orgName.toLowerCase()));
+                        acceptableOrganizations.add(groupName.toLowerCase());
+                    }
                 } else if (groupDefinitions.hasOwnProperty(orgFilterText)) {
                     const groupOrgs = groupDefinitions[orgFilterText];
-                    groupOrgs.forEach(orgName => acceptableOrganizations.add(orgName.toLowerCase()));
-                    acceptableOrganizations.add(orgFilterText.toLowerCase());
+                    if (groupOrgs) {
+                        groupOrgs.forEach(orgName => acceptableOrganizations.add(orgName.toLowerCase()));
+                        acceptableOrganizations.add(orgFilterText.toLowerCase());
+                    }
                 } else {
                     acceptableOrganizations.add(orgFilterText);
                 }
@@ -351,85 +358,57 @@
             });
         }
 
-        orgSearchInput.addEventListener('input', filterOptions);
-        searchInput.addEventListener('input', filterOptions);
-
-        refreshButton.addEventListener('click', async () => {
-            refreshButton.disabled = true;
-            refreshButton.innerText = '⏳';
-            await reloadData();
-            await filterOptions();
-            refreshButton.disabled = false;
-            refreshButton.innerText = '🔄';
-        });
-
-        filterOptions();
-
-        document.body.appendChild(container);
-
-        function closeSearchBox(event) {
-            if (event.target !== container && !container.contains(event.target)) {
-                container.remove();
-                document.removeEventListener('mousedown', closeSearchBox);
-            }
+        function resizeTextarea(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.max(textarea.scrollHeight, 80) + 'px';
         }
 
-        document.addEventListener('mousedown', closeSearchBox);
-
-        searchInput.focus();
-    }
-
-    function resizeTextarea(textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = Math.max(textarea.scrollHeight, 80) + 'px';
-    }
-
-    document.addEventListener('input', (event) => {
-        if (event.target.tagName.toLowerCase() === 'textarea' &&
-            event.target.classList.contains('form-control') &&
-            (event.target.placeholder === 'Message for Student')) {
-            resizeTextarea(event.target);
-        }
-    }, true);
-
-    document.addEventListener('dblclick', (event) => {
-        if (event.target.tagName.toLowerCase() === 'textarea' &&
-            event.target.classList.contains('form-control') &&
-            (event.target.placeholder === 'Message for Student')) {
-
-            event.preventDefault();
-
-            let currentRow = event.target.closest('tr');
-            if (!currentRow) return;
-
-            let mainRow = currentRow.previousElementSibling;
-            if (!mainRow) return;
-
-            let testNameCell = mainRow.cells[2];
-            if (!testNameCell) return;
-
-            let testNameElement = testNameCell.querySelector('vp');
-            let testName = testNameElement ? testNameElement.innerText.trim() : '';
-
-            let organizationCell = mainRow.cells[4];
-            if (!organizationCell) return;
-
-            let organizationElement = organizationCell.querySelector('em') || organizationCell.querySelector('vp');
-            let organizationName = organizationElement ? organizationElement.innerText.trim() : '';
-
-            createSearchableList(event.target, testName, organizationName);
-
-            event.target.addEventListener('input', () => {
+        document.addEventListener('input', (event) => {
+            if (event.target.tagName.toLowerCase() === 'textarea' &&
+                event.target.classList.contains('form-control') &&
+                (event.target.placeholder === 'Message for Student')) {
                 resizeTextarea(event.target);
-            });
-        }
-    }, true);
+            }
+        }, true);
 
-    window.addEventListener('load', (event) => {
-        const textarea = document.querySelector('textarea.form-control[placeholder="Message for Student"]');
-        if (textarea) {
-            textarea.style.height = '80px';
-            resizeTextarea(textarea);
-        }
-    });
-})();
+        document.addEventListener('dblclick', (event) => {
+            if (event.target.tagName.toLowerCase() === 'textarea' &&
+                event.target.classList.contains('form-control') &&
+                (event.target.placeholder === 'Message for Student')) {
+
+                event.preventDefault();
+
+                let currentRow = event.target.closest('tr');
+                if (!currentRow) return;
+
+                let mainRow = currentRow.previousElementSibling;
+                if (!mainRow) return;
+
+                let testNameCell = mainRow.cells[2];
+                if (!testNameCell) return;
+
+                let testNameElement = testNameCell.querySelector('vp');
+                let testName = testNameElement ? testNameElement.innerText.trim() : '';
+
+                let organizationCell = mainRow.cells[4];
+                if (!organizationCell) return;
+
+                let organizationElement = organizationCell.querySelector('em') || organizationCell.querySelector('vp');
+                let organizationName = organizationElement ? organizationElement.innerText.trim() : '';
+
+                createSearchableList(event.target, testName, organizationName);
+
+                event.target.addEventListener('input', () => {
+                    resizeTextarea(event.target);
+                });
+            }
+        }, true);
+
+        window.addEventListener('load', (event) => {
+            const textarea = document.querySelector('textarea.form-control[placeholder="Message for Student"]');
+            if (textarea) {
+                textarea.style.height = '80px';
+                resizeTextarea(textarea);
+            }
+        });
+    })();
