@@ -460,13 +460,18 @@
                     starIcon.addEventListener('click', (e) => {
                         e.stopPropagation();
                         if (isFavorite) {
-                            favorites[currentTestName] = favorites[currentTestName].filter(favOption => !(favOption.organization === option.organization && favOption.reason === option.reason));
+                            starIcon.innerText = '💔';
+                            setTimeout(() => {
+                                favorites[currentTestName] = favorites[currentTestName].filter(favOption => !(favOption.organization === option.organization && favOption.reason === option.reason));
+                                saveFavorites();
+                                filterOptions();
+                            }, 2000);
                         } else {
                             if (!favorites[currentTestName]) favorites[currentTestName] = [];
                             favorites[currentTestName].push(option);
+                            saveFavorites();
+                            filterOptions();
                         }
-                        saveFavorites();
-                        filterOptions();
                     });
 
                     optionDiv.prepend(starIcon);
