@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Review Queue - Rejection Reasons
+// @name         Review Queue - Rejection Reasons 4.9 / 9/20/2024
 // @namespace    http://viewpointscreening.com
 // @version      4.9
-// @description  Popup Box with searchable rejection reasons, with fixes and improvements
+// @description  Popup Box with searchable rejection reasons
 // @author       Mike! Yay!
 // @match        https://www.viewpointscreening.com/thereviewqueue*
 // @grant        GM_xmlhttpRequest
@@ -144,30 +144,71 @@
     function createSearchableList(textarea, testName = '', organizationName = '') {
         const container = document.createElement('div');
         container.style.position = 'fixed';
-        container.style.top = '15%';
-        container.style.left = '50%';
-        container.style.transform = 'translate(-50%, 0)';
         container.style.backgroundColor = 'white';
         container.style.padding = '1rem';
         container.style.border = '1px solid black';
         container.style.zIndex = 1000;
-        container.style.overflowY = 'auto';
-        container.style.maxHeight = '80vh';
-        container.style.width = '80vw';
-        container.style.maxWidth = '1200px';
+        container.style.overflow = 'hidden';
         container.style.boxSizing = 'border-box';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.borderRadius = '8px';
+        container.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+
+        const savedSettings = JSON.parse(localStorage.getItem('rejection_reasons_popup_settings') || '{}');
+        container.style.top = savedSettings.top || '15%';
+        container.style.left = savedSettings.left || '50%';
+        container.style.transform = savedSettings.top && savedSettings.left ? 'none' : 'translate(-50%, 0)';
+        container.style.width = savedSettings.width || '80vw';
+        container.style.height = savedSettings.height || '80vh';
 
         const headerContainer = document.createElement('div');
         headerContainer.style.display = 'flex';
         headerContainer.style.alignItems = 'center';
         headerContainer.style.marginBottom = '1rem';
-        container.appendChild(headerContainer);
+        headerContainer.style.cursor = 'move';
+        headerContainer.style.userSelect = 'none';
+        headerContainer.style.flexShrink = '0';
+        headerContainer.style.width = '100%';
+
+        const title = document.createElement('span');
+        title.innerText = 'MWH';
+        title.style.fontSize = '16px';
+        title.style.fontWeight = 'bold';
+        title.style.marginRight = 'auto';
+        title.style.color = 'white';
+        headerContainer.appendChild(title);
+
+        const closeButton = document.createElement('button');
+        closeButton.innerText = '✖';
+        closeButton.title = 'Close';
+        closeButton.style.marginLeft = 'auto';
+        closeButton.style.cursor = 'pointer';
+        closeButton.style.border = 'none';
+        closeButton.style.background = 'none';
+        closeButton.style.fontSize = '16px';
+        closeButton.style.padding = '0 5px';
+        closeButton.style.lineHeight = '1';
+
+        closeButton.addEventListener('click', () => {
+            container.remove();
+            document.removeEventListener('mousedown', closeSearchBox);
+        });
+
+        headerContainer.appendChild(closeButton);
+
+        const searchInputsContainer = document.createElement('div');
+        searchInputsContainer.style.display = 'flex';
+        searchInputsContainer.style.marginTop = '0.5rem';
+        searchInputsContainer.style.flexWrap = 'wrap';
+        searchInputsContainer.style.width = '100%';
 
         const orgSearchInput = document.createElement('input');
         orgSearchInput.setAttribute('type', 'text');
         orgSearchInput.setAttribute('placeholder', 'Search Organization...');
-        orgSearchInput.style.flex = '1';
+        orgSearchInput.style.flex = '1 1 200px';
         orgSearchInput.style.marginRight = '0.5rem';
+        orgSearchInput.style.marginBottom = '0.5rem';
         orgSearchInput.style.color = 'black';
         orgSearchInput.style.padding = '0.5rem';
         orgSearchInput.style.border = '1px solid #ccc';
@@ -177,8 +218,9 @@
         const reasonSearchInput = document.createElement('input');
         reasonSearchInput.setAttribute('type', 'text');
         reasonSearchInput.setAttribute('placeholder', 'Search Rejection Reason...');
-        reasonSearchInput.style.flex = '1';
+        reasonSearchInput.style.flex = '1 1 200px';
         reasonSearchInput.style.marginRight = '0.5rem';
+        reasonSearchInput.style.marginBottom = '0.5rem';
         reasonSearchInput.style.color = 'black';
         reasonSearchInput.style.padding = '0.5rem';
         reasonSearchInput.style.border = '1px solid #ccc';
@@ -194,10 +236,14 @@
         refreshButton.style.border = 'none';
         refreshButton.style.background = 'none';
         refreshButton.style.padding = '0';
+        refreshButton.style.marginBottom = '0.5rem';
 
-        headerContainer.appendChild(orgSearchInput);
-        headerContainer.appendChild(reasonSearchInput);
-        headerContainer.appendChild(refreshButton);
+        searchInputsContainer.appendChild(orgSearchInput);
+        searchInputsContainer.appendChild(reasonSearchInput);
+        searchInputsContainer.appendChild(refreshButton);
+
+        headerContainer.appendChild(searchInputsContainer);
+        container.appendChild(headerContainer);
 
         const messageSearchInput = document.createElement('input');
         messageSearchInput.setAttribute('type', 'text');
@@ -213,7 +259,20 @@
         container.appendChild(messageSearchInput);
 
         const optionsContainer = document.createElement('div');
+        optionsContainer.style.flex = '1';
+        optionsContainer.style.overflowY = 'auto';
         container.appendChild(optionsContainer);
+
+        const resizeHandle = document.createElement('div');
+        resizeHandle.style.width = '20px';
+        resizeHandle.style.height = '20px';
+        resizeHandle.style.background = 'transparent';
+        resizeHandle.style.position = 'absolute';
+        resizeHandle.style.right = '0';
+        resizeHandle.style.bottom = '0';
+        resizeHandle.style.cursor = 'nwse-resize';
+        resizeHandle.style.padding = '0';
+        container.appendChild(resizeHandle);
 
         async function filterOptions() {
             const orgFilterText = orgSearchInput.value.trim().toLowerCase();
@@ -345,18 +404,26 @@
 
             let displayIndex = 0;
 
-            function createOptionDiv({ option, reasonToDisplay, isDollarMessage }, isFavorite) {
+            function createOptionDiv({ option, reasonToDisplay, isDollarMessage, dollarOrder }, isFavorite) {
                 const optionDiv = document.createElement('div');
                 optionDiv.style.padding = '5px';
                 optionDiv.style.cursor = 'pointer';
                 optionDiv.style.whiteSpace = 'pre-wrap';
+                optionDiv.style.display = 'flex';
+                optionDiv.style.alignItems = 'center';
 
-                const originalBackgroundColor = displayIndex % 2 === 0 ? '#f0f0f0' : '#ffffff';
+                const originalBackgroundColor = displayIndex % 2 === 0 ? '#f9f9f9' : '#e9e9e9';
                 optionDiv.style.backgroundColor = originalBackgroundColor;
                 optionDiv.style.color = option.color || '#000000';
                 optionDiv.style.fontWeight = 'bold';
+                optionDiv.style.borderRadius = '4px';
+                optionDiv.style.marginBottom = '2px';
 
-                optionDiv.innerText = reasonToDisplay;
+                const reasonText = document.createElement('span');
+                reasonText.innerText = reasonToDisplay;
+                reasonText.style.flex = '1';
+
+                optionDiv.appendChild(reasonText);
 
                 optionDiv.addEventListener('click', () => {
                     let textareaValue = option.reason;
@@ -365,13 +432,14 @@
                     }
                     textarea.value = textareaValue;
                     container.remove();
+                    document.removeEventListener('mousedown', closeSearchBox);
 
                     const event = new Event('input', { bubbles: true, cancelable: true });
                     textarea.dispatchEvent(event);
                 });
 
                 optionDiv.addEventListener('mouseover', () => {
-                    optionDiv.style.backgroundColor = '#000000';
+                    optionDiv.style.backgroundColor = '#007BFF';
                     optionDiv.style.color = '#ffffff';
                 });
 
@@ -382,11 +450,12 @@
 
                 if (!isDollarMessage) {
                     const starIcon = document.createElement('span');
-                    starIcon.innerText = isFavorite ? ' ❤️️ ' : ' ♡ ';
+                    starIcon.innerText = isFavorite ? '❤️' : '♡';
                     starIcon.style.marginRight = '8px';
                     starIcon.style.color = 'red';
                     starIcon.style.cursor = 'pointer';
-                    starIcon.style.fontSize = '24px';
+                    starIcon.style.fontSize = '20px';
+                    starIcon.style.flexShrink = '0';
 
                     starIcon.addEventListener('click', (e) => {
                         e.stopPropagation();
@@ -412,6 +481,13 @@
             });
 
             if (favoriteOptions.length > 0) {
+                const favoriteHeader = document.createElement('div');
+                favoriteHeader.innerText = 'Favorites';
+                favoriteHeader.style.fontWeight = 'bold';
+                favoriteHeader.style.marginTop = '10px';
+                favoriteHeader.style.marginBottom = '5px';
+                optionsContainer.appendChild(favoriteHeader);
+
                 favoriteOptions.forEach(optionObj => {
                     createOptionDiv(optionObj, true);
                 });
@@ -456,8 +532,185 @@
 
         document.body.appendChild(container);
 
+        makeDraggable(container, headerContainer);
+
+        makeResizable(container, resizeHandle);
+
+        function savePopupSettings() {
+            const rect = container.getBoundingClientRect();
+            const settings = {
+                top: `${rect.top}px`,
+                left: `${rect.left}px`,
+                width: `${rect.width}px`,
+                height: `${rect.height}px`
+            };
+            localStorage.setItem('rejection_reasons_popup_settings', JSON.stringify(settings));
+        }
+
+        let isDragging = false;
+        let isResizing = false;
+
+        function makeDraggable(element, handle) {
+            handle.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return;
+                isDragging = true;
+                const rect = element.getBoundingClientRect();
+                const offsetX = e.clientX - rect.left;
+                const offsetY = e.clientY - rect.top;
+
+                function onMouseMove(eMove) {
+                    if (!isDragging) return;
+                    let newLeft = eMove.clientX - offsetX;
+                    let newTop = eMove.clientY - offsetY;
+
+                    const vpWidth = window.innerWidth;
+                    const vpHeight = window.innerHeight;
+                    const elemWidth = rect.width;
+                    const elemHeight = rect.height;
+
+                    newLeft = Math.max(0, Math.min(newLeft, vpWidth - elemWidth));
+                    newTop = Math.max(0, Math.min(newTop, vpHeight - elemHeight));
+
+                    element.style.left = `${newLeft}px`;
+                    element.style.top = `${newTop}px`;
+                    element.style.transform = 'none';
+                }
+
+                function onMouseUp() {
+                    if (isDragging) {
+                        isDragging = false;
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                        savePopupSettings();
+                    }
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+
+            handle.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                const touch = e.touches[0];
+                const rect = element.getBoundingClientRect();
+                const offsetX = touch.clientX - rect.left;
+                const offsetY = touch.clientY - rect.top;
+
+                function onTouchMove(eMove) {
+                    if (!isDragging) return;
+                    const touchMove = eMove.touches[0];
+                    let newLeft = touchMove.clientX - offsetX;
+                    let newTop = touchMove.clientY - offsetY;
+
+                    const vpWidth = window.innerWidth;
+                    const vpHeight = window.innerHeight;
+                    const elemWidth = rect.width;
+                    const elemHeight = rect.height;
+
+                    newLeft = Math.max(0, Math.min(newLeft, vpWidth - elemWidth));
+                    newTop = Math.max(0, Math.min(newTop, vpHeight - elemHeight));
+
+                    element.style.left = `${newLeft}px`;
+                    element.style.top = `${newTop}px`;
+                    element.style.transform = 'none';
+                }
+
+                function onTouchEnd() {
+                    if (isDragging) {
+                        isDragging = false;
+                        document.removeEventListener('touchmove', onTouchMove);
+                        document.removeEventListener('touchend', onTouchEnd);
+                        savePopupSettings();
+                    }
+                }
+
+                document.addEventListener('touchmove', onTouchMove);
+                document.addEventListener('touchend', onTouchEnd);
+            });
+        }
+
+        function makeResizable(element, handle) {
+            handle.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                isResizing = true;
+                const rect = element.getBoundingClientRect();
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startWidth = rect.width;
+                const startHeight = rect.height;
+
+                function onMouseMove(eMove) {
+                    if (!isResizing) return;
+                    let newWidth = startWidth + (eMove.clientX - startX);
+                    let newHeight = startHeight + (eMove.clientY - startY);
+
+                    newWidth = Math.max(300, newWidth);
+                    newHeight = Math.max(200, newHeight);
+                    newWidth = Math.min(window.innerWidth - rect.left - 20, newWidth);
+                    newHeight = Math.min(window.innerHeight - rect.top - 20, newHeight);
+
+                    element.style.width = `${newWidth}px`;
+                    element.style.height = `${newHeight}px`;
+                }
+
+                function onMouseUp() {
+                    if (isResizing) {
+                        isResizing = false;
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                        savePopupSettings();
+                    }
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+
+
+            handle.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                isResizing = true;
+                const touch = e.touches[0];
+                const rect = element.getBoundingClientRect();
+                const startX = touch.clientX;
+                const startY = touch.clientY;
+                const startWidth = rect.width;
+                const startHeight = rect.height;
+
+                function onTouchMove(eMove) {
+                    if (!isResizing) return;
+                    const touchMove = eMove.touches[0];
+                    let newWidth = startWidth + (touchMove.clientX - startX);
+                    let newHeight = startHeight + (touchMove.clientY - startY);
+
+
+                    newWidth = Math.max(300, newWidth);
+                    newHeight = Math.max(200, newHeight);
+                    newWidth = Math.min(window.innerWidth - rect.left - 20, newWidth);
+                    newHeight = Math.min(window.innerHeight - rect.top - 20, newHeight);
+
+                    element.style.width = `${newWidth}px`;
+                    element.style.height = `${newHeight}px`;
+                }
+
+                function onTouchEnd() {
+                    if (isResizing) {
+                        isResizing = false;
+                        document.removeEventListener('touchmove', onTouchMove);
+                        document.removeEventListener('touchend', onTouchEnd);
+                        savePopupSettings();
+                    }
+                }
+
+                document.addEventListener('touchmove', onTouchMove);
+                document.addEventListener('touchend', onTouchEnd);
+            });
+        }
+
+
         function closeSearchBox(event) {
-            if (event.target !== container && !container.contains(event.target)) {
+            if (!container.contains(event.target) && event.target !== container) {
                 container.remove();
                 document.removeEventListener('mousedown', closeSearchBox);
             }
